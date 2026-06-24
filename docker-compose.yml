@@ -1,11 +1,49 @@
 services:
   mongodb:
     image: mongo:8
-    container_name: kaspi-parser
+    restart: unless-stopped
     ports:
       - '27017:27017'
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/kaspi-parser
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PARSE_QUERY: ${PARSE_QUERY:-iphone}
+      PARSE_CRON: ${PARSE_CRON:-*/5 * * * * *}
+      PARSE_SLOT_MS: ${PARSE_SLOT_MS:-5000}
+      PORT: 3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   mongodb_data:
+  redis-data:

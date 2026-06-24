@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Product } from './product.schema';
@@ -16,6 +16,7 @@ interface KaspiResponse {
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
   private readonly kaspiUrl = 'https://kaspi.kz/yml/product-view/pl/results';
 
   constructor(
@@ -26,9 +27,11 @@ export class ProductsService {
     const search = query.trim();
 
     if (!search) {
+      this.logger.warn('Skipping parse because query is empty');
       return [];
     }
 
+    this.logger.log(`Starting parse for "${search}"`);
     let response: AxiosResponse<KaspiResponse>;
 
     try {
@@ -60,10 +63,12 @@ export class ProductsService {
     }));
 
     if (!products.length) {
+      this.logger.warn(`Kaspi returned no products for "${search}"`);
       return [];
     }
 
     const savedProducts = await this.productModel.insertMany(products);
+    this.logger.log(`Saved ${savedProducts.length} products for "${search}"`);
 
     return savedProducts.map(({ name, price, link, parsedAt }) => ({
       name,
